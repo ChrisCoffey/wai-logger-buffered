@@ -1,10 +1,10 @@
 name:                wai-middleware-buffered-logging
 version:             0.1.0.0
-github:              githubuser/wai-middleware-buffered-logging
+github:              ChrisCoffey/wai-middleware-buffered-logging
 license:             BSD3
-author:              Author name here
-maintainer:          example@example.com
-copyright:           2017 Author name here
+author:              Chris Coffey
+maintainer:          chris@collegevine.com
+copyright:           2017 Chris Coffey
 
 extra-source-files:
 - README.md
@@ -21,6 +21,10 @@ description:         Please see the README on Github at <https://github.com/gith
 
 dependencies:
 - base >= 4.7 && < 5
+- wai
+- containers
+- bytestring
+- time
 
 library:
   source-dirs: src
