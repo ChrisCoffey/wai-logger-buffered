@@ -1,20 +1,28 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Network.Wai.Logging.Buffered (
-   bufferedRequestLogger
+   bufferedRequestLogger,
+   runBufferedRequestLogger
 ) where
 
+import Control.Concurrent
+import Control.Monad (forever)
 import Data.Monoid ((<>))
-import Control.Exception (bracket, catch)
+import Control.Exception (bracket, catch, Exception, SomeException)
 import Network.Wai (Application, Request, Middleware,
                     rawPathInfo)
 import qualified Data.ByteString as BS
 import Data.Time.Clock (getCurrentTime, diffUTCTime, UTCTime, NominalDiffTime)
 import Data.IORef
 import System.IO.Unsafe (unsafePerformIO)
+import Data.Sequence as S
+import GHC.Exts (toList)
 
 data Config = Config {
-
+    maxSize :: Int,
+    publishIntervalSeconds :: Int,
+    pubFunc :: Publish
 }
 
 data Event = Event {
@@ -25,8 +33,10 @@ data Event = Event {
     deriving (Show, Eq, Ord)
 
 -- | The ordering of events within a buffer is unimportant
-newtype Buffer = Buffer [Event]
+newtype Buffer = Buffer (S.Seq Event)
     deriving (Eq, Ord, Monoid)
+
+bufferLen (Buffer ls) = S.length ls
 
 -- | There is only a single 'buffer' per instance of the milddleware. All calls are logged to the same
 -- buffer before publication.
@@ -34,43 +44,68 @@ newtype Buffer = Buffer [Event]
 -- This can obviously be pulled out and passed via a reader, but I can't think of
 -- a good reason to do that yet.
 buffer :: IORef Buffer
-buffer = unsafePerformIO . newIORef $ Buffer []
+{-# NOILINE buffer #-} buffer = unsafePerformIO . newIORef $ Buffer S.empty
 
 -- | adds an event to the buffer if the buffer is not full. If it is full, the event
 -- is dumped to stdOut
 logEvent ::
-    Request
+    Config
+    -> Request
     -> UTCTime
     -> IO ()
-logEvent req start = do
+logEvent (Config {..}) req start = do
     finish <- getCurrentTime
     let path = rawPathInfo req
         event = Event path finish (finish `diffUTCTime` start)
-    atomicModifyIORef' buffer $ addToBuffer event
+    -- its possible for other requets to join the buffer in the time it takes
+    -- between read & write. Those messages are added to the buffer rather than silently dropped
+    (Buffer b) <- readIORef buffer
+    if S.length b < maxSize
+    then atomicModifyIORef' buffer $ addToBuffer event
+    else print $ errorMsg event
     where
-        addToBuffer evt (Buffer ls) = (Buffer (evt:ls), ())
+        addToBuffer evt (Buffer ls) = (Buffer (evt S.<| ls), ())
 
+errorMsg ::
+   Event
+   -> String
+errorMsg Event {..} =
+    show reportedTime <> " [Error][Logging] Log Buffer Full. Dropping: \n" <>
+    "\tPath: "<>show path<> ", Duration: "<> show duration
 
-
+type Publish = [Event] -> IO ()
 -- | attempt to publish the buffer. on failure, the events remain in the buffer
 -- This assumes that there will generally be far more events in the publish buffer than
 -- have been added during function invocation
 publishBuffer ::
-    ([Event] -> IO ())
+    Publish
     -> IO ()
 publishBuffer doPublish = do
     events <- atomicModifyIORef' buffer clearBuffer
-    catch (doPublish events) $ \e -> do
-        atomicModifyIORef' buffer $ mergeBufer events
+    catch (doPublish $ toList events) (preserveAndLog $ toList events)
     where
-        clearBuffer (Buffer ls) = (Buffer [], ls)
+        clearBuffer (Buffer ls) = (Buffer S.empty, ls)
         mergeBufer events  b = (b <> Buffer events, ())
+        preserveAndLog :: [Event] -> SomeException -> IO ()
+        preserveAndLog events e = do
+            atomicModifyIORef' buffer . mergeBufer $ S.fromList events
+            print e
 
-bufferedRequestLogger :: Middleware
-bufferedRequestLogger app req sendResponse =
+runBufferedRequestLogger ::
+    Config
+    -> IO ()
+runBufferedRequestLogger (Config {..}) =
+    forever $ do
+        threadDelay $ toMicros publishIntervalSeconds
+        publishBuffer pubFunc
+    where
+        toMicros = (*) 1000000
+
+bufferedRequestLogger ::
+    Config
+    -> Middleware
+bufferedRequestLogger conf app req sendResponse =
     app req $ \res ->
         bracket getCurrentTime
-                (logEvent req)
+                (logEvent conf req)
                 (const $ sendResponse res)
-
-
