@@ -2,8 +2,11 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module Network.Wai.Logging.Buffered (
-   bufferedRequestLogger,
-   runBufferedRequestLogger
+    Config(..),
+    Event(..),
+    Publish,
+    bufferedRequestLogger,
+    runBufferedRequestLogger
 ) where
 
 import Control.Concurrent
@@ -35,6 +38,8 @@ data Event = Event {
 -- | The ordering of events within a buffer is unimportant
 newtype Buffer = Buffer (S.Seq Event)
     deriving (Eq, Ord, Monoid)
+
+type Publish = [Event] -> IO ()
 
 bufferLen (Buffer ls) = S.length ls
 
@@ -73,7 +78,6 @@ errorMsg Event {..} =
     show reportedTime <> " [Error][Logging] Log Buffer Full. Dropping: \n" <>
     "\tPath: "<>show path<> ", Duration: "<> show duration
 
-type Publish = [Event] -> IO ()
 -- | attempt to publish the buffer. on failure, the events remain in the buffer
 -- This assumes that there will generally be far more events in the publish buffer than
 -- have been added during function invocation
