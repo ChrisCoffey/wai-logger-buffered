@@ -1,6 +1,6 @@
-name:                wai-middleware-buffered-logging
+name:                wai-logger-buffered
 version:             0.1.0.0
-github:              ChrisCoffey/wai-middleware-buffered-logging
+github:              ChrisCoffey/wai-logger-buffered
 license:             BSD3
 author:              Chris Coffey
 maintainer:          chris@collegevine.com
@@ -11,13 +11,13 @@ extra-source-files:
 - ChangeLog.md
 
 # Metadata used when publishing your package
-synopsis:            Short description of your package
+synopsis:            A small library for performing buffered request logging rather than in-line logging
 # category:            Web
 
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on Github at <https://github.com/githubuser/wai-middleware-buffered-logging#readme>
+description:         see Readme.md
 
 dependencies:
 - base >= 4.7 && < 5
@@ -40,7 +40,7 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - wai-middleware-buffered-logging
+    - wai-logger-buffered
     - wai
     - warp
     - http-types
@@ -49,7 +49,7 @@ executables:
     - time
 
 tests:
-  wai-middleware-buffered-logging-test:
+  wai-logger-buffered:
     main:                Spec.hs
     source-dirs:         test
     ghc-options:
@@ -57,4 +57,4 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - wai-middleware-buffered-logging
+    - wai-logger-buffered

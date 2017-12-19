@@ -2,12 +2,12 @@
 --
 -- see: https://github.com/sol/hpack
 
-name:           wai-middleware-buffered-logging
+name:           wai-logger-buffered
 version:        0.1.0.0
-synopsis:       Short description of your package
-description:    Please see the README on Github at <https://github.com/githubuser/wai-middleware-buffered-logging#readme>
-homepage:       https://github.com/ChrisCoffey/wai-middleware-buffered-logging#readme
-bug-reports:    https://github.com/ChrisCoffey/wai-middleware-buffered-logging/issues
+synopsis:       A small library for performing buffered request logging rather than in-line logging
+description:    see Readme.md
+homepage:       https://github.com/ChrisCoffey/wai-logger-buffered#readme
+bug-reports:    https://github.com/ChrisCoffey/wai-logger-buffered/issues
 author:         Chris Coffey
 maintainer:     chris@collegevine.com
 copyright:      2017 Chris Coffey
@@ -22,7 +22,7 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/ChrisCoffey/wai-middleware-buffered-logging
+  location: https://github.com/ChrisCoffey/wai-logger-buffered
 
 library
   hs-source-dirs:
@@ -37,7 +37,7 @@ library
       Network.Wai.Logging.Buffered
   other-modules:
       Lib
-      Paths_wai_middleware_buffered_logging
+      Paths_wai_logger_buffered
   default-language: Haskell2010
 
 executable example
@@ -51,7 +51,7 @@ executable example
     , containers
     , bytestring
     , time
-    , wai-middleware-buffered-logging
+    , wai-logger-buffered
     , wai
     , warp
     , http-types
@@ -60,7 +60,7 @@ executable example
     , time
   default-language: Haskell2010
 
-test-suite wai-middleware-buffered-logging-test
+test-suite wai-logger-buffered
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   hs-source-dirs:
@@ -72,5 +72,5 @@ test-suite wai-middleware-buffered-logging-test
     , containers
     , bytestring
     , time
-    , wai-middleware-buffered-logging
+    , wai-logger-buffered
   default-language: Haskell2010
