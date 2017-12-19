@@ -29,9 +29,9 @@ data Config = Config {
 }
 
 data Event = Event {
-    path:: BS.ByteString,
-    reportedTime :: UTCTime,
-    duration :: NominalDiffTime
+    path:: !BS.ByteString,
+    reportedTime :: !UTCTime,
+    duration :: !NominalDiffTime
     }
     deriving (Show, Eq, Ord)
 
@@ -49,7 +49,8 @@ bufferLen (Buffer ls) = S.length ls
 -- This can obviously be pulled out and passed via a reader, but I can't think of
 -- a good reason to do that yet.
 buffer :: IORef Buffer
-{-# NOILINE buffer #-} buffer = unsafePerformIO . newIORef $ Buffer S.empty
+{-# NOINLINE buffer #-}
+buffer = unsafePerformIO . newIORef $ Buffer S.empty
 
 -- | adds an event to the buffer if the buffer is not full. If it is full, the event
 -- is dumped to stdOut
