@@ -1,5 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Network.Wai.Logging.Buffered (
     Config(..),
@@ -11,21 +12,25 @@ module Network.Wai.Logging.Buffered (
 
 import Control.Concurrent
 import Control.Monad (forever)
+import Data.Foldable (foldl')
 import Data.Monoid ((<>))
 import Control.Exception (bracket, catch, Exception, SomeException)
 import Network.Wai (Application, Request, Middleware,
                     rawPathInfo)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BSC
 import Data.Time.Clock (getCurrentTime, diffUTCTime, UTCTime, NominalDiffTime)
 import Data.IORef
 import System.IO.Unsafe (unsafePerformIO)
-import Data.Sequence as S
+import qualified Data.Sequence as S
+import qualified Data.Map as M
 import GHC.Exts (toList)
 
 data Config = Config {
     maxSize :: Int,
     publishIntervalSeconds :: Int,
-    pubFunc :: Publish
+    pubFunc :: Publish,
+    useWildcards :: Bool -- | Determines whether to publish the original path and a '*' wildcarded version
 }
 
 data Event = Event {
@@ -83,12 +88,17 @@ errorMsg Event {..} =
 -- This assumes that there will generally be far more events in the publish buffer than
 -- have been added during function invocation
 publishBuffer ::
-    Publish
+    Bool
+    -> Publish
     -> IO ()
-publishBuffer doPublish = do
+publishBuffer useWc doPublish = do
     events <- atomicModifyIORef' buffer clearBuffer
-    catch (doPublish $ toList events) (preserveAndLog $ toList events)
+    let events' = if useWc
+        then concat . M.elems. M.filterWithKey wcPred $ foldl' applyWildCard M.empty events
+        else toList events
+    catch (doPublish events') (preserveAndLog events')
     where
+        wcPred k xs = (length xs > 1 && BSC.any (== '*') k) || BSC.all (/= '*') k
         clearBuffer (Buffer ls) = (Buffer S.empty, ls)
         mergeBufer events  b = (b <> Buffer events, ())
         preserveAndLog :: [Event] -> SomeException -> IO ()
@@ -102,7 +112,7 @@ runBufferedRequestLogger ::
 runBufferedRequestLogger (Config {..}) =
     forever $ do
         threadDelay $ toMicros publishIntervalSeconds
-        publishBuffer pubFunc
+        publishBuffer useWildcards pubFunc
     where
         toMicros = (*) 1000000
 
@@ -114,3 +124,30 @@ bufferedRequestLogger conf app req sendResponse =
         bracket getCurrentTime
                 (logEvent conf req)
                 (const $ sendResponse res)
+
+applyWildCard ::
+    M.Map BS.ByteString [Event]
+    -> Event
+    -> M.Map BS.ByteString [Event]
+applyWildCard known e =
+    foldl' accum known $ setPath <$> wildCardPermutations (path e)
+    where
+        accum m evt = M.insertWith (<>) (path evt) [evt] m
+        setPath p = e {path = p}
+
+wildCardPermutations ::
+    BS.ByteString
+    -> [BS.ByteString]
+wildCardPermutations "" = []
+wildCardPermutations path = let
+    segments = BSC.split '/' path
+    wildcarded = perms segments
+    res = BS.intercalate "/" <$> wildcarded
+    in res
+    where
+        replaceAt :: [BS.ByteString] -> Int -> [BS.ByteString]
+        replaceAt bs n = case Prelude.splitAt n bs of
+            (as, []) -> as
+            (as, b:bs) -> as <> ("*":bs)
+        perms :: [BS.ByteString] -> [[BS.ByteString]]
+        perms xs = replaceAt xs <$> [0.. Prelude.length xs]

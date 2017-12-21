@@ -36,7 +36,6 @@ library
   exposed-modules:
       Network.Wai.Logging.Buffered
   other-modules:
-      Lib
       Paths_wai_logger_buffered
   default-language: Haskell2010
 

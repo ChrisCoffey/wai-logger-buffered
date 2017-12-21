@@ -22,6 +22,7 @@ defaultConfig = Config {
     maxSize = 10000
     , publishIntervalSeconds = 15
     , pubFunc = stdOutLogger
+    , useWildcards = True
     }
 
 demoApp :: Application
