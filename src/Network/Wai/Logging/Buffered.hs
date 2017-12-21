@@ -2,6 +2,16 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+-- |
+-- Module:      Network.Wai.Logging.Buffered
+-- Copyright:   (c) 2017 Chris Coffey
+-- License:     MIT
+-- Maintainer:  Chris Coffey <chris@foldl.io>
+-- Stability:   experimental
+-- Portability: portable
+--
+-- A small library for adding buffered logging to Wai applications.
+--
 module Network.Wai.Logging.Buffered (
     Config(..),
     Event(..),
@@ -16,7 +26,7 @@ import Data.Foldable (foldl')
 import Data.Monoid ((<>))
 import Control.Exception (bracket, catch, Exception, SomeException)
 import Network.Wai (Application, Request, Middleware,
-                    rawPathInfo)
+                    rawPathInfo, requestMethod)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC
 import Data.Time.Clock (getCurrentTime, diffUTCTime, UTCTime, NominalDiffTime)
@@ -30,7 +40,7 @@ data Config = Config {
     maxSize :: Int,
     publishIntervalSeconds :: Int,
     pubFunc :: Publish,
-    useWildcards :: Bool -- | Determines whether to publish the original path and a '*' wildcarded version
+    useWildcards :: Bool -- | Determines whether to publish the original path and a '*' wildcarded version. This will slow down publishing
 }
 
 data Event = Event {
@@ -67,7 +77,7 @@ logEvent ::
 logEvent (Config {..}) req start = do
     finish <- getCurrentTime
     let path = rawPathInfo req
-        event = Event path finish (finish `diffUTCTime` start)
+        event = Event (requestMethod req <>":"<>path) finish (finish `diffUTCTime` start)
     -- its possible for other requets to join the buffer in the time it takes
     -- between read & write. Those messages are added to the buffer rather than silently dropped
     (Buffer b) <- readIORef buffer
@@ -125,6 +135,7 @@ bufferedRequestLogger conf app req sendResponse =
                 (logEvent conf req)
                 (const $ sendResponse res)
 
+-- TODO add hspec tests
 applyWildCard ::
     M.Map BS.ByteString [Event]
     -> Event
@@ -135,6 +146,7 @@ applyWildCard known e =
         accum m evt = M.insertWith (<>) (path evt) [evt] m
         setPath p = e {path = p}
 
+-- TODO add hspec tests
 wildCardPermutations ::
     BS.ByteString
     -> [BS.ByteString]
