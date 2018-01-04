@@ -40,7 +40,7 @@ data Config = Config {
     maxSize :: Int,
     publishIntervalSeconds :: Int,
     pubFunc :: Publish,
-    useWildcards :: Bool -- | Determines whether to publish the original path and a '*' wildcarded version. This will slow down publishing
+    useWildcards :: Bool -- ^ Determines whether to publish the original path and a '*' wildcarded version. This will slow down publishing
 }
 
 data Event = Event {
