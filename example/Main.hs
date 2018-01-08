@@ -14,8 +14,7 @@ import Network.Wai
 import Network.Wai.Logging.Buffered
 import Network.Wai.Handler.Warp
 import Network.HTTP.Types.Status (status200)
-import Control.Concurrent (forkIO)
--- goal is to write a wai example client
+import Control.Concurrent (forkIO, threadDelay)
 
 defaultConfig :: Config
 defaultConfig = Config {
@@ -26,7 +25,8 @@ defaultConfig = Config {
     }
 
 demoApp :: Application
-demoApp req respond =
+demoApp req respond = do
+    threadDelay 5000000
     respond $ responseLBS status200 [] "Logging Demo"
 
 main :: IO ()

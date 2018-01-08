@@ -27,6 +27,7 @@ import Data.Monoid ((<>))
 import Control.Exception (bracket, catch, Exception, SomeException)
 import Network.Wai (Application, Request, Middleware,
                     rawPathInfo, requestMethod)
+import Network.Wai.Internal (Response(..))
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC
 import Data.Time.Clock (getCurrentTime, diffUTCTime, UTCTime, NominalDiffTime)
@@ -35,6 +36,15 @@ import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.Sequence as S
 import qualified Data.Map as M
 import GHC.Exts (toList)
+
+-- | $setup
+--
+-- >>> :set -XOverloadedStrings
+-- >>> import qualified Data.Map as M
+-- >>> import Data.Time.Clock
+-- >>> now <- getCurrentTime
+-- >>> let events = Event "dummy" now <$> [1..]
+--
 
 data Config = Config {
     maxSize :: Int,
@@ -55,8 +65,6 @@ newtype Buffer = Buffer (S.Seq Event)
     deriving (Eq, Ord, Monoid)
 
 type Publish = [Event] -> IO ()
-
-bufferLen (Buffer ls) = S.length ls
 
 -- | There is only a single 'buffer' per instance of the milddleware. All calls are logged to the same
 -- buffer before publication.
@@ -86,6 +94,10 @@ logEvent (Config {..}) req start = do
     else print $ errorMsg event
     where
         addToBuffer evt (Buffer ls) = (Buffer (evt S.<| ls), ())
+
+-- | Dumps overflow messages to stdOut
+--
+-- >>>
 
 errorMsg ::
    Event
@@ -129,11 +141,14 @@ runBufferedRequestLogger (Config {..}) =
 bufferedRequestLogger ::
     Config
     -> Middleware
-bufferedRequestLogger conf app req sendResponse =
-    app req $ \res ->
-        bracket getCurrentTime
-                (logEvent conf req)
-                (const $ sendResponse res)
+bufferedRequestLogger conf app req sendResponse = do
+    t0 <- getCurrentTime
+    app req $ \res -> do
+        x <- case res of
+            ResponseRaw{} -> pure ()
+            _ -> pure ()
+        logEvent conf req t0
+        sendResponse res
 
 -- TODO add hspec tests
 applyWildCard ::
