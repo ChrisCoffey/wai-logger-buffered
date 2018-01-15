@@ -2,12 +2,13 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: c2ba44870f44dfbb6df9400d63a9052fccb7d72d1095b9058434f6fdbe89c86c
+-- hash: 64b03a256caf40536e8d616c20ed66ab46bafb9950e4ec7a5ef756aa524cf47a
 
 name:           wai-logger-buffered
 version:        0.1.0.0
-synopsis:       A small library for performing buffered request logging rather than in-line logging
-description:    see Readme.md
+synopsis:       Buffer requets before logging them
+description:    Simplifies logging request metrics to services like Graphite or Elasticsearch.
+category:       Web
 homepage:       https://github.com/ChrisCoffey/wai-logger-buffered#readme
 bug-reports:    https://github.com/ChrisCoffey/wai-logger-buffered/issues
 author:         Chris Coffey
