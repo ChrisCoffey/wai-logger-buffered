@@ -10,32 +10,47 @@
 -- Stability:   experimental
 -- Portability: portable
 --
--- A small library for adding buffered logging to Wai applications.
+-- Middleware for buffering log messages instead of immediately writing them to a handle.
+--
+-- This allows easy integration with tools providing bulk publish apis like Graphite or Elasticsearch.
+--
+-- @
+--    main :: IO ()
+--    main = do
+--      forkIO $ runBufferedRequestLogger def
+--      run 8080 $ bufferedRequestLogger def waiApplication
+-- @
+--
+-- A note about wildcards: the '*' wildcard is used to collapse similar URLs for easier reporting on external platforms.
 --
 module Network.Wai.Logging.Buffered (
+    -- * Types
     Config(..),
     Event(..),
     Publish,
+    -- * Functions
     bufferedRequestLogger,
     runBufferedRequestLogger
 ) where
 
 import Control.Concurrent
-import Control.Monad (forever)
-import Data.Foldable (foldl')
-import Data.Monoid ((<>))
 import Control.Exception (bracket, catch, Exception, SomeException)
+import Control.Monad (forever)
+import Data.Default (Default(..))
+import Data.Foldable (foldl')
+import Data.IORef
+import Data.Monoid ((<>))
+import Data.Time.Clock (getCurrentTime, diffUTCTime, UTCTime, NominalDiffTime)
+import GHC.Exts (toList)
 import Network.Wai (Application, Request, Middleware,
                     rawPathInfo, requestMethod)
 import Network.Wai.Internal (Response(..))
+import System.IO.Unsafe (unsafePerformIO)
+
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC
-import Data.Time.Clock (getCurrentTime, diffUTCTime, UTCTime, NominalDiffTime)
-import Data.IORef
-import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.Sequence as S
 import qualified Data.Map as M
-import GHC.Exts (toList)
 
 -- | $setup
 --
@@ -46,16 +61,36 @@ import GHC.Exts (toList)
 -- >>> let events = Event "dummy" now <$> [1..]
 --
 
+-- | A log sink.
+type Publish = [Event] -> IO ()
+
+-- | Configuration arguments for draining the buffer
 data Config = Config {
+    -- | The maximum size allowed for the buffer. After this is hit messages are pushed to stdOut. Defaults to 1000
     maxSize :: Int,
+    -- | How frequently to publish events to the sink. Defaults to 10 (seconds)
     publishIntervalSeconds :: Int,
+    -- | The sink function. Defaults to `print`
     pubFunc :: Publish,
-    useWildcards :: Bool -- ^ Determines whether to publish the original path and a '*' wildcarded version. This will slow down publishing
+    -- | Determines whether to publish the original path and a '*' wildcarded version. Defaults to 'True'
+    useWildcards :: Bool
 }
 
+instance Default Config where
+    def = Config {
+        maxSize = 1000,
+        publishIntervalSeconds = 10,
+        pubFunc = print,
+        useWildcards = True
+        }
+
+-- | Tracks a single 'Request'
 data Event = Event {
+    -- | The request URL
     path:: !BS.ByteString,
+    -- | The time the request occurred
     reportedTime :: !UTCTime,
+    -- | The request duration
     duration :: !NominalDiffTime
     }
     deriving (Show, Eq, Ord)
@@ -64,9 +99,8 @@ data Event = Event {
 newtype Buffer = Buffer (S.Seq Event)
     deriving (Eq, Ord, Monoid)
 
-type Publish = [Event] -> IO ()
 
--- | There is only a single 'buffer' per instance of the milddleware. All calls are logged to the same
+-- | There is only a single buffer per instance of the milddleware. All calls are logged to the same
 -- buffer before publication.
 --
 -- This can obviously be pulled out and passed via a reader, but I can't think of
@@ -128,6 +162,9 @@ publishBuffer useWc doPublish = do
             atomicModifyIORef' buffer . mergeBufer $ S.fromList events
             print e
 
+-- | Based on the provided 'Config' publishes the logged requests & drains the buffer. The ideal configuration
+-- depends on your workload, but know that each request is stored as is. I.e. if you handle 1k req/s, then you should
+-- make sure 'maxSize'/'publishIntervalSeconds' > 1000.
 runBufferedRequestLogger ::
     Config
     -> IO ()
@@ -138,6 +175,8 @@ runBufferedRequestLogger (Config {..}) =
     where
         toMicros = (*) 1000000
 
+-- | Collect timing on all 'Request's and add them to the buffer. Configuration is controlled via the provided
+-- 'Config'
 bufferedRequestLogger ::
     Config
     -> Middleware
@@ -150,7 +189,6 @@ bufferedRequestLogger conf app req sendResponse = do
         logEvent conf req t0
         sendResponse res
 
--- TODO add hspec tests
 applyWildCard ::
     M.Map BS.ByteString [Event]
     -> Event
@@ -161,7 +199,7 @@ applyWildCard known e =
         accum m evt = M.insertWith (<>) (path evt) [evt] m
         setPath p = e {path = p}
 
--- TODO add hspec tests
+-- TODO use edit distance on the path segments rather than simple replace logic
 wildCardPermutations ::
     BS.ByteString
     -> [BS.ByteString]

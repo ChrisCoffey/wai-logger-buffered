@@ -25,6 +25,7 @@ dependencies:
 - containers
 - bytestring
 - time
+- data-default
 
 library:
   source-dirs: src
