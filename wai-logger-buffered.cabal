@@ -2,10 +2,10 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 64b03a256caf40536e8d616c20ed66ab46bafb9950e4ec7a5ef756aa524cf47a
+-- hash: 18b045c877f18dc1e32e8b7952122be306f20731a3c96529a5680e5cc8e68e73
 
 name:           wai-logger-buffered
-version:        0.1.0.0
+version:        0.1.0.1
 synopsis:       Buffer requets before logging them
 description:    Simplifies logging request metrics to services like Graphite or Elasticsearch.
 category:       Web

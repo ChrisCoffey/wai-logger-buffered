@@ -1,5 +1,5 @@
 name:                wai-logger-buffered
-version:             0.1.0.0
+version:             0.1.0.1
 github:              ChrisCoffey/wai-logger-buffered
 license:             BSD3
 author:              Chris Coffey

@@ -52,14 +52,6 @@ import qualified Data.ByteString.Char8 as BSC
 import qualified Data.Sequence as S
 import qualified Data.Map as M
 
--- | $setup
---
--- >>> :set -XOverloadedStrings
--- >>> import qualified Data.Map as M
--- >>> import Data.Time.Clock
--- >>> now <- getCurrentTime
--- >>> let events = Event "dummy" now <$> [1..]
---
 
 -- | A log sink.
 type Publish = [Event] -> IO ()
